@@ -1,0 +1,42 @@
+name: 美股報告
+
+on:
+  schedule:
+    # 每天早上 6:00 台灣時間 (UTC+8) = 前一天 22:00 UTC
+    - cron: '0 22 * * *'
+  # 允許手動觸發測試
+  workflow_dispatch:
+
+jobs:
+  stock-report:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 檢出代碼
+        uses: actions/checkout@v4
+
+      - name: 設置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安裝依賴
+        run: |
+          pip install yfinance pytz google-api-python-client google-auth-httplib2 google-auth-oauthlib
+
+      - name: 設置 Gmail 憑證
+        env:
+          GMAIL_TOKEN: ${{ secrets.GMAIL_TOKEN }}
+        run: |
+          echo "$GMAIL_TOKEN" > token_gmail.json
+
+      - name: 執行美股報告
+        env:
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+        run: |
+          python stock_report.py
+
+      - name: 清理憑證
+        if: always()
+        run: |
+          rm -f token_gmail.json

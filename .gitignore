@@ -1,0 +1,49 @@
+# Gmail credentials
+token_gmail.json
+token_calendar.json
+token.json
+credentials.json
+flora-gae11-48f2f2e53de7.json
+gmail_token_base64.txt
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Claude Code settings
+.claude/
+
+# Node modules
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Other unnecessary files
+*.jsonl
+*.xlsx
+*.html
+*.log
+*_backup.*
+*.bak
+*.tmp
+
+# Keep only these specific files (excluding others)
+# We'll only add the files we need manually
