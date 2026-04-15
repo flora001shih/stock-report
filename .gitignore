@@ -45,5 +45,6 @@ Thumbs.db
 *.bak
 *.tmp
 
-# Keep only these specific files (excluding others)
-# We'll only add the files we need manually
+# Keep these specific markdown files
+!README.md
+!CLAUDE_SETTINGS_BACKUP.md
