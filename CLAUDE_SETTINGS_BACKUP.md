@@ -115,20 +115,24 @@ python setup_github_actions.py
 
 ### 方法 2: 使用 Python 腳本
 
-```python
-# 安裝套件
-pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
-
-# 查詢檔案列表腳本
-# (使用 workspace-mcp 或直接使用 Google Drive API)
-```
-
-### 方法 3: 使用 Claude Code + workspace-mcp
-
 ```bash
-# 列出最近的檔案
-# (需要先啟用 MCP 服務)
+cd "C:/Claude_Test_Lab"
+python list_drive_files.py
 ```
+
+### 方法 3: 使用 Claude Code (推薦)
+
+直接對 Claude Code 說：
+```
+幫我列出 Google 雲端硬碟最近修改的 3 個檔案
+```
+
+或
+```
+幫我列出 Google 雲端硬碟最近查看的檔案
+```
+
+Claude Code 會自動執行查詢腳本並顯示結果。
 
 ---
 
