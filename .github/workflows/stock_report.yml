@@ -24,19 +24,9 @@ jobs:
         run: |
           pip install yfinance pytz google-api-python-client google-auth-httplib2 google-auth-oauthlib
 
-      - name: 設置 Gmail 憑證
-        env:
-          GMAIL_TOKEN: ${{ secrets.GMAIL_TOKEN }}
-        run: |
-          echo "$GMAIL_TOKEN" > token_gmail.json
-
       - name: 執行美股報告
         env:
+          GMAIL_TOKEN: ${{ secrets.GMAIL_TOKEN }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
         run: |
           python stock_report.py
-
-      - name: 清理憑證
-        if: always()
-        run: |
-          rm -f token_gmail.json
