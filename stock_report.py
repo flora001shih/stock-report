@@ -17,6 +17,11 @@ if sys.platform == 'win32':
     import io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
+# Configuration
+TOKEN_FILE = 'token_gmail.json'
+# Recipient email from environment variable or default
+RECIPIENT_EMAIL = os.environ.get('RECIPIENT_EMAIL', 'florashih324@gmail.com')
+
 # Check for GitHub Actions token (base64 encoded)
 github_token = os.environ.get('GMAIL_TOKEN')
 if github_token:
@@ -28,11 +33,6 @@ if github_token:
         print("Gmail token loaded from GitHub Secrets")
     except Exception as e:
         print(f"Warning: Failed to decode GitHub token: {e}")
-
-# Configuration
-TOKEN_FILE = 'token_gmail.json'
-# Recipient email from environment variable or default
-RECIPIENT_EMAIL = os.environ.get('RECIPIENT_EMAIL', 'florashih324@gmail.com')
 LABEL_NAME = '美股'
 SCOPES = ['https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/gmail.labels', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.modify']
 
