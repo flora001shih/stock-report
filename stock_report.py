@@ -91,7 +91,7 @@ def get_stock_data(symbol, report_date):
 
     for i in range(len(hist) - 1, -1, -1):
         hist_date = hist.index[i].date()
-        if hist_date <= report_date.date():
+        if hist_date <= report_date:
             report_data = hist.iloc[i]
             if i > 0:
                 prev_data = hist.iloc[i - 1]
