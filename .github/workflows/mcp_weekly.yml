@@ -22,7 +22,7 @@ jobs:
 
       - name: 安裝依賴
         run: |
-          pip install requests pytz google-api-python-client google-auth-httplib2 google-auth-oauthlib
+          pip install requests pytz google-api-python-client google-auth-httplib2 google-auth-oauthlib deep-translator
 
       - name: 執行 MCP 週報生成
         env:

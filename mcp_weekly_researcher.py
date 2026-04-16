@@ -56,6 +56,100 @@ def get_credentials():
 
     return creds
 
+def translate_to_traditional_chinese(text, max_retries=2):
+    """Translate text to Traditional Chinese with error handling"""
+    if not text or text == '無描述':
+        return text
+
+    # Technical terms dictionary for better translation
+    tech_terms = {
+        'Repository': '程式庫',
+        'repositories': '程式庫',
+        'server': '伺服器',
+        'Server': '伺服器',
+        'endpoint': '端點',
+        'Endpoint': '端點',
+        'authentication': '認證',
+        'Authentication': '認證',
+        'API': 'API',
+        'client': '用戶端',
+        'Client': '用戶端',
+        'Model': '模型',
+        'model': '模型',
+        'protocol': '協議',
+        'Protocol': '協議',
+        'implementation': '實作',
+        'Implementation': '實作',
+        'integration': '整合',
+        'Integration': '整合',
+        'MCP': 'MCP (Model Context Protocol)',
+        'Model Context Protocol': 'MCP (Model Context Protocol)',
+        'Claude': 'Claude',
+        'Anthropic': 'Anthropic',
+        'tool': '工具',
+        'Tool': '工具',
+        'extension': '擴充功能',
+        'Extension': '擴充功能',
+        'plugin': '外掛',
+        'Plugin': '外掛',
+        'wrapper': '包裝器',
+        'Wrapper': '包裝器',
+        'interface': '介面',
+        'Interface': '介面',
+        'provider': '提供者',
+        'Provider': '提供者',
+        'resource': '資源',
+        'Resource': '資源',
+    }
+
+    # Pre-process: preserve technical terms
+    original_text = text
+    placeholders = {}
+    for i, (en, tw) in enumerate(tech_terms.items()):
+        placeholder = f"__TERM{i}__"
+        text = text.replace(en, placeholder)
+        placeholders[placeholder] = tw
+
+    for attempt in range(max_retries):
+        try:
+            # Use deep_translator (more reliable than googletrans)
+            from deep_translator import GoogleTranslator
+            translator = GoogleTranslator(source='auto', target='zh-TW')
+            translated = translator.translate(text)
+
+            # Post-process: restore technical terms
+            for placeholder, term in placeholders.items():
+                translated = translated.replace(placeholder, term)
+
+            return translated
+
+        except Exception as e:
+            print(f"Warning: Translation attempt {attempt + 1} failed: {e}")
+            if attempt < max_retries - 1:
+                import time
+                time.sleep(1)  # Wait before retry
+            continue
+
+    # If all attempts failed, return original with note
+    return f"{original_text} (自動翻譯暫時不可用)"
+
+def translate_descriptions(repos):
+    """Translate descriptions for all repos in batch"""
+    print("開始翻譯專案描述...")
+    translated_count = 0
+
+    for repo in repos:
+        desc = repo.get('description', '')
+        if desc and desc != '無描述':
+            translated = translate_to_traditional_chinese(desc)
+            repo['description_tw'] = translated
+            translated_count += 1
+        else:
+            repo['description_tw'] = desc
+
+    print(f"完成 {translated_count} 個專案描述的翻譯")
+    return repos
+
 def search_github_trending_repos(days=7, limit=10):
     """Search GitHub for trending MCP repositories (most stars added in last 7 days)"""
     print("=" * 60)
@@ -237,6 +331,7 @@ def generate_recommendations(all_items):
             'name': item['name'],
             'stars': item.get('stars', 0),
             'description': item['description'],
+            'description_tw': item.get('description_tw', ''),
             'url': item['url']
         })
 
@@ -245,6 +340,7 @@ def generate_recommendations(all_items):
             'name': item['name'],
             'stars': item.get('stars', 0),
             'description': item['description'],
+            'description_tw': item.get('description_tw', ''),
             'url': item['url']
         })
 
@@ -256,6 +352,7 @@ def generate_recommendations(all_items):
             'name': item['name'],
             'url': item['url'],
             'description': item['description'],
+            'description_tw': item.get('description_tw', ''),
             'reason': '高人氣且活躍的專案，值得深入了解'
         })
 
@@ -418,6 +515,43 @@ def generate_html_report(trending, reddit, top_all, recommendations, report_date
         a:hover {{
             text-decoration: underline;
         }}
+        .description-en {{
+            font-weight: 500;
+            color: #333;
+        }}
+        .description-tw {{
+            background: #f9f9f9;
+            color: #666;
+            font-style: italic;
+            font-size: 13px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            margin-top: 5px;
+            display: block;
+        }}
+        /* Mobile responsive adjustments */
+        @media only screen and (max-width: 600px) {{
+            .container {{
+                padding: 10px;
+            }}
+            .header h1 {{
+                font-size: 24px;
+            }}
+            .section {{
+                padding: 15px;
+                margin: 10px;
+            }}
+            table {{
+                font-size: 12px;
+            }}
+            th, td {{
+                padding: 8px 5px;
+            }}
+            .description-tw {{
+                font-size: 11px;
+                padding: 4px 6px;
+            }}
+        }}
     </style>
 </head>
 <body>
@@ -442,11 +576,17 @@ def generate_html_report(trending, reddit, top_all, recommendations, report_date
                 <tbody>"""
 
     for i, repo in enumerate(trending, 1):
+        desc_en = repo.get('description', '無描述')
+        desc_tw = repo.get('description_tw', '')
+
         html += f"""
                     <tr>
                         <td><span class="rank">{i}</span></td>
                         <td><a href="{repo['url']}" target="_blank" class="repo-name">{repo['name']}</a></td>
-                        <td>{repo['description']}</td>
+                        <td>
+                            <span class="description-en">{desc_en}</span>
+                            {f'<span class="description-tw">{desc_tw}</span>' if desc_tw and desc_tw != desc_en else ''}
+                        </td>
                         <td><span class="repo-stars">★ {repo['stars']}</span></td>
                     </tr>"""
 
@@ -499,11 +639,17 @@ def generate_html_report(trending, reddit, top_all, recommendations, report_date
                 <tbody>"""
 
     for i, repo in enumerate(top_all, 1):
+        desc_en = repo.get('description', '無描述')
+        desc_tw = repo.get('description_tw', '')
+
         html += f"""
                     <tr>
                         <td><span class="rank">{i}</span></td>
                         <td><a href="{repo['url']}" target="_blank" class="repo-name">{repo['name']}</a></td>
-                        <td>{repo['description']}</td>
+                        <td>
+                            <span class="description-en">{desc_en}</span>
+                            {f'<span class="description-tw">{desc_tw}</span>' if desc_tw and desc_tw != desc_en else ''}
+                        </td>
                         <td><span class="repo-stars">★ {repo['stars']}</span></td>
                     </tr>"""
 
@@ -517,9 +663,14 @@ def generate_html_report(trending, reddit, top_all, recommendations, report_date
             <div class="section-title">🎯 AI 專業建議（重點推薦）</div>"""
 
     for i, rec in enumerate(recommendations, 1):
+        desc_en = rec.get('description', '無描述')
+        desc_tw = rec.get('description_tw', '')
+
         html += f"""
             <div class="recommendation">
                 <h3>{i}. {rec['name']}</h3>
+                <p><strong>功能：</strong><span class="description-en">{desc_en}</span></p>
+                {f'<p class="description-tw"><strong>功能（中文）：</strong>{desc_tw}</p>' if desc_tw and desc_tw != desc_en else ''}
                 <p><strong>功能：</strong>{rec['description']}</p>
                 <p><strong>網址：</strong><a href="{rec['url']}" target="_blank">{rec['url']}</a></p>
                 <p class="recommendation-reason">💡 {rec['reason']}</p>
@@ -774,6 +925,11 @@ def main():
     trending = search_github_trending_repos(days=7, limit=10)
     reddit = search_reddit_trending(limit=10)
     top_all = search_github_all_time_stars(limit=10)
+
+    # Translate descriptions to Traditional Chinese
+    print()
+    translate_descriptions(trending)
+    translate_descriptions(top_all)
 
     all_items = {'trending': trending, 'top_all': top_all}
     recommendations = generate_recommendations(all_items)
