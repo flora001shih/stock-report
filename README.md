@@ -1,120 +1,248 @@
-# 美股報告自動發送系統 (GitHub Actions 版本)
+# Gmail Janitor - Gmail 自動整理工具
 
-## 功能說明
+自動將 Gmail 收件匣中的郵件分類並整理到待審標籤，支援定期排程執行與郵件通知。
 
-使用 GitHub Actions 自動發送美股報告到 Gmail，包含：
-- 道瓊工業指數 (DJI) 的漲跌幅
-- 台積電 ADR (TSM) 的漲跌幅
-- 郵件會自動加上 **[美股]** 標籤
-- 發送新郵件後，自動將舊郵件移到垃圾桶
+## 功能特色
 
-## MCP 全球生態與趨勢週報
+- **四種分類標籤**：自動將郵件分類為純廣告、系統通知、疑似可退訂、垃圾慣犯
+- **IMPORTANT 豁免**：自動跳過被標示為重要的郵件
+- **白名單保護**：銀行、投資、信用卡等重要郵件自動豁免
+- **定期排程**：每年 6/30 和 12/31 自動執行整理
+- **預告通知**：執行前一週（6/23 和 12/24）發送預告郵件
+- **結果報告**：整理完成後發送統計報告郵件
+- **不刪除郵件**：僅分類和封存，安全無虞
 
-使用 GitHub Actions 每週一早上 8:00 自動發送 MCP 週報，包含：
-- **本週新秀**：過去 7 天新增最多 Star 的 MCP 專案
-- **社群熱議**：Reddit (r/ClaudeAI, r/LocalLLaMA) 與 Smithery.ai 討論度最高的項目
-- **全球霸主**：GitHub 歷史總 Star 最高的 MCP Server
-- **AI 專業建議**：從熱門項目中推薦 3 個重點專案
+## 目錄結構
 
-## 優勢
+```
+.
+├── .github/
+│   └── workflows/
+│       └── gmail_maintenance.yml    # GitHub Actions 工作流程
+├── gmail_janitor.py                  # 主要整理腳本
+├── send_notification.py             # 郵件通知腳本
+├── gmail_restore_important.py        # IMPORTANT 郵件還原工具
+├── check_all_labels_important.py     # 檢查標籤工具
+└── README.md                         # 本文件
+```
 
-✅ **雲端執行** - 不需要電腦開機也能發送
-✅ **完全免費** - GitHub Actions 公開 repository 免費
-✅ **自動定時** - 美股每天 06:00、MCP 週報每週一 08:00 自動執行
+## 安裝與設定
 
-## 設置步驟
+### 1. 前置需求
 
-### 1. 創建 GitHub Repository
+- Python 3.7+
+- Gmail API 權限
 
-1. 前往 https://github.com/new
-2. 創建一個新的公開 repository (例如: `stock-report`)
-3. 記下您的 repository URL
+### 2. 安裝依賴
 
-### 2. 設置 GitHub Secrets
+```bash
+pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib pytz
+```
 
-在 GitHub repository 中：
-1. 點擊 **Settings** → **Secrets and variables** → **Actions**
-2. 點擊 **New repository secret**
+### 3. 設定 Gmail API 憑證
 
-添加以下兩個 Secrets：
+首次執行時需要進行 OAuth 授權：
 
-| Secret 名稱 | Secret 值 |
-|-------------|-----------|
-| `GMAIL_TOKEN` | 查看 `gmail_token_base64.txt` 文件的內容 |
-| `RECIPIENT_EMAIL` | `florashih324@gmail.com` (或您的目標 Email) |
+```bash
+python gmail_janitor.py
+```
 
-### 3. 推送代碼到 GitHub
+授權完成後，會產生 `token_gmail.json` 檔案。
 
-在 `C:\Claude_Test_Lab` 目錄執行：
+### 4. GitHub Actions 設定
+
+#### 4.1 將憑證儲存到 GitHub Secrets
+
+1. 將 `token_gmail.json` 的內容進行 Base64 編碼：
+
+```bash
+# Linux/Mac
+base64 -w 0 token_gmail.json
+
+# Windows PowerShell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("token_gmail.json"))
+```
+
+2. 將編碼後的字串複製
+
+3. 到 GitHub 倉庫設定 Secrets：
+   - 進入 `Settings` > `Secrets and variables` > `Actions`
+   - 點擊 `New repository secret`
+   - Name: `GMAIL_TOKEN`
+   - Value: 貼上 Base64 編碼的字串
+   - 點擊 `Add secret`
+
+#### 4.2 推送檔案到 GitHub
 
 ```bash
 git init
 git add .
-git commit -m "Initial commit: Stock report with GitHub Actions"
+git commit -m "Add Gmail Janitor automation"
 git branch -M main
 git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
 git push -u origin main
 ```
 
-請將 `YOUR_USERNAME` 換成您的 GitHub 用戶名，`YOUR_REPO` 換成您的 repository 名稱。
+## 使用方式
 
-### 4. 驗證設置
+### 本地執行
 
-1. 推送後，前往 GitHub repository 的 **Actions** 頁面
-2. 應該會看到 **「美股報告」** workflow
-3. 點擊 **「Run workflow」** 手動測試
-4. 確認每天 UTC 22:00 (台灣時間早上 6:00) 會自動執行
-
-## 時間說明
-
-- **執行時間**: 每天 UTC 22:00
-- **台灣時間**: 每天 06:00 (UTC+8)
-- **原因**: GitHub Actions 使用 UTC 時區
-
-## 檔案說明
-
-| 檔案 | 說明 |
-|------|------|
-| `.github/workflows/stock_report.yml` | GitHub Actions 工作流程配置 |
-| `stock_report.py` | 主程式 - 獲取股價並發送郵件 |
-| `gmail_auth.py` | Gmail API 授權腳本 (本地測試用) |
-| `setup_github_actions.py` | 生成 GitHub Secrets 設置說明 |
-| `gmail_token_base64.txt` | Base64 編碼的 Gmail token (用於 GitHub Secrets) |
-
-## 注意事項
-
-1. **Gmail token 有效期**: OAuth token 通常 7 天後會過期，建議定期重新生成
-2. **美股交易日判斷**: 週末和美股假期不會發送報告
-3. **郵件清理**: 每次發送新郵件後，舊郵件會自動移到垃圾桶
-
-## 本地測試
-
-如果需要在本地測試：
+#### 完整整理
 
 ```bash
-# 重新授權 (如果 token 過期)
-python gmail_auth.py
+python gmail_janitor.py
+```
 
-# 執行測試
-python stock_report.py
+#### 發送預告通知
+
+```bash
+python send_notification.py --type warning
+```
+
+#### 發送結果通知
+
+```bash
+python send_notification.py --type result
+```
+
+### GitHub Actions 自動執行
+
+#### 排程時間
+
+| 類型 | 日期 | 台灣時間 | UTC 時間 |
+|------|------|----------|----------|
+| 預告通知 | 6月23日 | 08:00 | 00:00 |
+| 預告通知 | 12月24日 | 08:00 | 00:00 |
+| 正式執行 | 6月30日 | 08:00 | 00:00 |
+| 正式執行 | 12月31日 | 08:00 | 00:00 |
+
+#### 手動觸發
+
+1. 到 GitHub 倉庫的 `Actions` 頁面
+2. 選擇 `Gmail Maintenance` 工作流程
+3. 點擊 `Run workflow`
+4. 選擇執行模式：
+   - `full`: 完整執行（預告 + 整理 + 結果）
+   - `warning`: 僅發送預告
+   - `janitor`: 僅執行整理
+   - `result`: 僅發送結果
+
+## 分類規則
+
+### 四種標籤
+
+| 標籤名稱 | 說明 | 判斷條件 |
+|----------|------|----------|
+| [AI]待審刪-1.純廣告類 | 電商促銷、行銷活動 | 包含促銷、特賣、折扣、優惠等關鍵字 |
+| [AI]待審刪-2.系統通知類 | 超過1個月的不重要登入提醒 | 包含更新、登入、驗證、通知等系統關鍵字 |
+| [AI]待審刪-3.疑似可退訂 | 以前訂閱但現在不看的內容 | 郵件地址包含 newsletter、noreply 等模式 |
+| [AI]待審刪-4.垃圾慣犯 | 發送頻率高但從不閱讀的寄件者 | 來自已知垃圾發信者清單 |
+
+### 豁免條件
+
+以下情況郵件會被自動豁免，不會被分類：
+
+1. **標示為 IMPORTANT** 的郵件
+2. 包含以下關鍵字：銀行、投資、信用卡、帳單、bank、investment、credit card、bill
+3. 來自個人郵件地址（gmail.com、outlook.com、hotmail.com）
+4. 來自垃圾慣犯清單的寄件者
+
+## 郵件通知
+
+### 預告郵件
+
+- **標題**: `[AI]預告：Gmail 自動整理任務即將執行`
+- **發送時間**: 6月23日 和 12月24日 08:00 台灣時間
+- **內容**: 說明將在一週後執行整理任務
+
+### 結果郵件
+
+- **標題**: `[AI]報告：Gmail 半年度自動整理已完成`
+- **發送時間**: 6月30日 和 12月31日 整理完成後
+- **內容**: 包含統計數據
+  - 總共掃描封數
+  - 總共處理封數
+  - 各標籤分類結果
+  - 驗證結果（是否有遺漏的 IMPORTANT 郵件）
+
+### 系統通知標籤
+
+所有由系統自動發送的郵件都會自動加上 `[AI]系統通知` 標籤。
+
+## 統計報告
+
+執行後會產生 `gmail_janitor_report.json` 檔案，包含以下資訊：
+
+```json
+{
+  "executed_at": "2026-06-30T00:00:00",
+  "completed_at": "2026-06-30T00:05:30",
+  "duration_seconds": 330.5,
+  "total_scanned": 5432,
+  "total_processed": 1234,
+  "total_skipped": 4198,
+  "skipped_important": 56,
+  "skipped_whitelisted": 4142,
+  "verification_passed": true,
+  "categories": {
+    "[AI]待審刪-1.純廣告類...": 456,
+    "[AI]待審刪-2.系統通知類...": 321,
+    "[AI]待審刪-3.疑似可退訂...": 234,
+    "[AI]待審刪-4.垃圾慣犯...": 223
+  },
+  "label_scan_results": {
+    "[AI]待審刪-1.純廣告類...": 456,
+    "[AI]待審刪-2.系統通知類...": 321,
+    "[AI]待審刪-3.疑似可退訂...": 234,
+    "[AI]待審刪-4.垃圾慣犯...": 223
+  }
+}
 ```
 
 ## 故障排除
 
-### 問題：GitHub Actions 執行失敗
-- 檢查 GitHub Secrets 是否正確設置
-- 檢查 Gmail token 是否過期 (重新執行 `python setup_github_actions.py`)
+### 重新授權
 
-### 問題：收不到郵件
-- 檢查 Gmail 垃圾信箱
-- 檢查 Actions 頁面的執行日誌
+如果出現授權錯誤：
 
-### 問題：股價數據獲取失敗
-- yfinance 服務可能暫時無法使用，請稍後再試
+```bash
+rm token_gmail.json
+python gmail_janitor.py
+```
+
+### 檢查 IMPORTANT 郵件
+
+檢查待審標籤中是否還有遺漏的 IMPORTANT 郵件：
+
+```bash
+python check_all_labels_important.py
+```
+
+### 還原 IMPORTANT 郵件
+
+將待審標籤中的 IMPORTANT 郵件還原到收件匣：
+
+```bash
+python gmail_restore_important.py
+```
+
+## 安全性
+
+- 不會刪除任何郵件
+- 所有 IMPORTANT 郵件都會被豁免
+- 使用 Gmail 官方 API
+- 憑證以 Base64 編碼儲存在 GitHub Secrets
+- 支援手動確認後再執行
 
 ## 授權
 
-本項目使用以下開源套件：
-- yfinance
-- google-api-python-client
-- pytz
+MIT License
+
+## 貢獻
+
+歡迎提交 Issue 和 Pull Request！
+
+---
+
+**版本**: 1.0.0
+**最後更新**: 2026年4月

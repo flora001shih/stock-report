@@ -1,0 +1,170 @@
+name: Gmail Maintenance
+
+on:
+  # 預告排程 - 執行前一週的 08:00 台灣時間 (00:00 UTC)
+  schedule:
+    - cron: '0 0 23 6 *'    # 6月23日 08:00 台灣時間 (上半年預告)
+    - cron: '0 0 24 12 *'   # 12月24日 08:00 台灣時間 (下半年預告)
+
+  # 正式執行排程 - 當天 08:00 台灣時間 (00:00 UTC)
+  schedule:
+    - cron: '0 0 30 6 *'    # 6月30日 08:00 台灣時間 (上半年執行)
+    - cron: '0 0 31 12 *'   # 12月31日 08:00 台灣時間 (下半年執行)
+
+  # 允許手動觸發
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '執行模式'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full       # 完整執行：發送預告 + 執行整理 + 發送結果
+          - warning    # 僅發送預告
+          - janitor    # 僅執行整理
+          - result     # 僅發送結果（需要先有報告檔案）
+
+jobs:
+  determine-action:
+    runs-on: ubuntu-latest
+    outputs:
+      action: ${{ steps.determine.outputs.action }}
+    steps:
+      - name: Determine action based on date
+        id: determine
+        run: |
+          # 獲取當前日期（UTC）
+          current_date=$(date -u +"%m-%d %H:%M")
+          current_day=$(date -u +"%d")
+          current_month=$(date -u +"%m")
+
+          echo "Current UTC time: $current_date"
+
+          # 判斷應該執行哪個動作
+          if [[ "$current_month" == "06" && "$current_day" == "23" ]]; then
+            echo "action=warning" >> $GITHUB_OUTPUT
+            echo "Mode: 預告通知 (6月23日)"
+          elif [[ "$current_month" == "12" && "$current_day" == "24" ]]; then
+            echo "action=warning" >> $GITHUB_OUTPUT
+            echo "Mode: 預告通知 (12月24日)"
+          elif [[ "$current_month" == "06" && "$current_day" == "30" ]]; then
+            echo "action=full" >> $GITHUB_OUTPUT
+            echo "Mode: 完整執行 (6月30日)"
+          elif [[ "$current_month" == "12" && "$current_day" == "31" ]]; then
+            echo "action=full" >> $GITHUB_OUTPUT
+            echo "Mode: 完整執行 (12月31日)"
+          else
+            # 手動觸發
+            echo "action=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
+            echo "Mode: 手動觸發 (${{ github.event.inputs.mode }})"
+          fi
+
+  send-warning:
+    needs: determine-action
+    if: needs.determine-action.outputs.action == 'warning' || needs.determine-action.outputs.action == 'full'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib pytz
+
+      - name: Send warning notification
+        env:
+          GMAIL_TOKEN: ${{ secrets.GMAIL_TOKEN }}
+        run: |
+          python send_notification.py --type warning
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: warning-logs-${{ github.run_number }}
+          path: |
+            *.log
+            *.json
+
+  run-janitor:
+    needs: determine-action
+    if: needs.determine-action.outputs.action == 'full' || needs.determine-action.outputs.action == 'janitor'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib pytz
+
+      - name: Run Gmail Janitor
+        env:
+          GMAIL_TOKEN: ${{ secrets.GMAIL_TOKEN }}
+        run: |
+          python gmail_janitor.py
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: janitor-report-${{ github.run_number }}
+          path: gmail_janitor_report.json
+          retention-days: 90
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: janitor-logs-${{ github.run_number }}
+          path: |
+            *.log
+            *.json
+
+  send-result:
+    needs: [determine-action, run-janitor]
+    if: needs.determine-action.outputs.action == 'full' || needs.determine-action.outputs.action == 'result'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib pytz
+
+      - name: Download report
+        uses: actions/download-artifact@v4
+        with:
+          name: janitor-report-${{ github.run_number }}
+          path: ./
+
+      - name: Send result notification
+        env:
+          GMAIL_TOKEN: ${{ secrets.GMAIL_TOKEN }}
+        run: |
+          python send_notification.py --type result --report gmail_janitor_report.json
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: result-logs-${{ github.run_number }}
+          path: |
+            *.log
+            *.json
