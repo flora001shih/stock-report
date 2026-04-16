@@ -1,0 +1,32 @@
+name: MCP全球生態週報
+
+on:
+  schedule:
+    # 每週一台灣時間早上 8:00 (UTC 00:00)
+    - cron: '0 0 * * 1'
+  # 允許手動觸發測試
+  workflow_dispatch:
+
+jobs:
+  mcp-weekly-report:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 檢出代碼
+        uses: actions/checkout@v4
+
+      - name: 設置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安裝依賴
+        run: |
+          pip install requests pytz google-api-python-client google-auth-httplib2 google-auth-oauthlib
+
+      - name: 執行 MCP 週報生成
+        env:
+          GMAIL_TOKEN: ${{ secrets.GMAIL_TOKEN }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+        run: |
+          python mcp_weekly_researcher.py
