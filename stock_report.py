@@ -33,7 +33,7 @@ if github_token:
         print("Gmail token loaded from GitHub Secrets")
     except Exception as e:
         print(f"Warning: Failed to decode GitHub token: {e}")
-LABEL_NAME = '美股'
+LABEL_NAME = '[AI]美股'
 SCOPES = ['https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/gmail.labels', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.modify']
 
 # US Market holidays (simplified list for major holidays)
@@ -108,7 +108,7 @@ def get_stock_data(symbol, report_date):
     return latest_close, change, change_pct
 
 def get_or_create_label(service):
-    """Get or create the [美股] label"""
+    """Get or create the [[AI]美股] label"""
     try:
         # Try to find existing label
         labels = service.users().labels().list(userId='me').execute()
@@ -161,9 +161,9 @@ def send_email(service, subject, body, label_id=None):
     return message_id
 
 def get_old_stock_reports(service, label_id, exclude_message_id=None):
-    """Get old stock report emails with the [美股] label"""
+    """Get old stock report emails with the [[AI]美股] label"""
     try:
-        # Search for messages with the [美股] label
+        # Search for messages with the [[AI]美股] label
         # Use label name for search, not ID
         query = f'label:{LABEL_NAME}'
 
@@ -263,9 +263,9 @@ def generate_report():
     dow_arrow = '▲' if dow_change >= 0 else '▼'
     tsm_arrow = '▲' if tsm_change >= 0 else '▼'
 
-    # Format subject: [[美股04/14]道瓊▲ 317.74 (0.66%).台積電▲ $10.32 (2.79%)]
+    # Format subject: [[[AI]美股04/14]道瓊▲ 317.74 (0.66%).台積電▲ $10.32 (2.79%)]
     date_str = report_date.strftime('%m/%d')
-    subject = f"[[美股{date_str}]道瓊{dow_arrow} {abs(dow_change):,.2f} ({abs(dow_change_pct):.2f}%).台積電{tsm_arrow} ${abs(tsm_change):.2f} ({abs(tsm_change_pct):.2f}%)]"
+    subject = f"[[[AI]美股{date_str}]道瓊{dow_arrow} {abs(dow_change):,.2f} ({abs(dow_change_pct):.2f}%).台積電{tsm_arrow} ${abs(tsm_change):.2f} ({abs(tsm_change_pct):.2f}%)]"
 
     body = f"""
 <!DOCTYPE html>
@@ -343,7 +343,7 @@ def main():
     service = build('gmail', 'v1', credentials=creds)
 
     # Get or create label
-    print("Checking/creating [美股] label...")
+    print("Checking/creating [[AI]美股] label...")
     label_id = get_or_create_label(service)
     print(f"Label ID: {label_id}")
     print()

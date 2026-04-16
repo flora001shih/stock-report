@@ -30,7 +30,7 @@ if github_token:
 # Configuration
 TOKEN_FILE = 'token_gmail.json'
 RECIPIENT_EMAIL = os.environ.get('RECIPIENT_EMAIL', 'florashih324@gmail.com')
-LABEL_NAME = 'MCP週報'
+LABEL_NAME = '[AI]MCP週報'
 SCOPES = ['https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/gmail.labels',
           'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.modify']
 
@@ -718,7 +718,7 @@ def send_email(service, subject, body, label_id=None):
     return message_id
 
 def get_or_create_label(service):
-    """Get or create the [MCP週報] label"""
+    """Get or create the [[AI]MCP週報] label"""
     try:
         labels = service.users().labels().list(userId='me').execute()
         for label in labels.get('labels', []):
@@ -740,7 +740,7 @@ def get_or_create_label(service):
         return None
 
 def get_mcp_weekly_reports(service):
-    """Get all emails with [MCP週報] label"""
+    """Get all emails with [[AI]MCP週報] label"""
     try:
         query = f'label:{LABEL_NAME}'
         results = service.users().messages().list(
@@ -796,7 +796,7 @@ def cleanup_old_monthly_reports(service, current_message_id):
     all_reports = get_mcp_weekly_reports(service)
 
     if not all_reports:
-        print("沒有找到舊的 MCP 週報郵件")
+        print("沒有找到舊的 [AI]MCP 週報郵件")
         return
 
     # Filter out the newly sent message
@@ -952,7 +952,7 @@ def main():
     label_id = get_or_create_label(service)
 
     date_str = report_date.strftime('%Y/%m/%d')
-    subject = f"[MCP週報] 全球熱門伺服器與趨勢彙整 ({date_str})"
+    subject = f"[[AI]MCP週報] 全球熱門伺服器與趨勢彙整 ({date_str})"
 
     message_id = send_email(service, subject, html, label_id)
     print(f"郵件發送成功！Message ID: {message_id}")
