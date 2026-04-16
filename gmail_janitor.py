@@ -293,7 +293,7 @@ def scan_and_categorize(service, days_ago=DEFAULT_SCAN_DAYS):
     return results
 
 def process_emails_batch(service, message_ids, label_ids):
-    """批次處理郵件：使用 batchGet API 提升性能"""
+    """批次處理郵件"""
     categorized = {
         'pure_ad': [],
         'system': [],
@@ -305,10 +305,10 @@ def process_emails_batch(service, message_ids, label_ids):
     skipped_important = 0
     skipped_whitelisted = 0
 
-    print(f"\n開始分類郵件 (使用批次處理)...")
+    print(f"\n開始分類郵件...")
     print("=" * 60)
 
-    # 批次處理，每批最多 100 封
+    # Gmail API 不支持 batchGet，使用逐個獲取但優化參數
     batch_size = 100
     total_batches = (len(message_ids) + batch_size - 1) // batch_size
 
@@ -319,118 +319,64 @@ def process_emails_batch(service, message_ids, label_ids):
 
         print(f"處理批次 {batch_idx + 1}/{total_batches} (郵件 {start_idx + 1}-{end_idx})...")
 
-        try:
-            # 使用 batchGet API 批次獲取郵件詳情
-            batch_response = service.users().messages().batchGet(
-                userId='me',
-                ids=batch_ids,
-                format='metadata',
-                metadataHeaders=['From', 'Subject']
-            ).execute()
+        for msg in batch_ids:
+            try:
+                # 提取郵件 ID (message_ids 是字典列表，需要取 id 欄位)
+                msg_id = msg['id'] if isinstance(msg, dict) else msg
 
-            for msg in batch_response.get('messages', []):
-                try:
-                    msg_id = msg['id']
-                    headers = msg.get('payload', {}).get('headers', [])
-                    from_header = None
-                    subject = None
+                # 獲取郵件詳情 (使用 format='metadata' 優化)
+                msg_detail = service.users().messages().get(
+                    userId='me',
+                    id=msg_id,
+                    format='metadata',
+                    metadataHeaders=['From', 'Subject']
+                ).execute()
 
-                    for header in headers:
-                        if header['name'] == 'From':
-                            from_header = header['value']
-                        elif header['name'] == 'Subject':
-                            subject = header['value']
+                headers = msg_detail.get('payload', {}).get('headers', [])
+                from_header = None
+                subject = None
 
-                    sender_name = None
-                    sender_email = None
-                    if from_header:
-                        match = re.search(r'^(.*?)\s*<([^>]+)>$', from_header)
-                        if match:
-                            sender_name = match.group(1).strip('" ')
-                            sender_email = match.group(2)
-                        else:
-                            sender_email = from_header.strip()
+                for header in headers:
+                    if header['name'] == 'From':
+                        from_header = header['value']
+                    elif header['name'] == 'Subject':
+                        subject = header['value']
 
-                    # 檢查是否為重要郵件
-                    msg_label_ids = msg.get('labelIds', [])
-                    if 'IMPORTANT' in msg_label_ids:
-                        skipped_important += 1
-                        skipped += 1
-                        continue
-
-                    # 分類
-                    category, subtype = categorize_email(subject, sender_email, sender_name)
-
-                    if category and category in categorized:
-                        categorized[category].append(msg_id)
-                    elif category == 'pure_ad' and subtype:
-                        # 如果被分類為純廣告，確認是否在白名單
-                        if not is_whitelisted(subject, sender_email, sender_name):
-                            categorized[category].append(msg_id)
-                        else:
-                            skipped_whitelisted += 1
-                            skipped += 1
+                sender_name = None
+                sender_email = None
+                if from_header:
+                    match = re.search(r'^(.*?)\s*<([^>]+)>$', from_header)
+                    if match:
+                        sender_name = match.group(1).strip('" ')
+                        sender_email = match.group(2)
                     else:
-                        skipped += 1
+                        sender_email = from_header.strip()
 
-                except Exception as e:
-                    print(f"  Warning: 處理郵件失敗: {e}")
+                # 檢查是否為重要郵件
+                msg_label_ids = msg_detail.get('labelIds', [])
+                if 'IMPORTANT' in msg_label_ids:
+                    skipped_important += 1
+                    skipped += 1
                     continue
 
-        except Exception as e:
-            print(f"  Warning: 批次獲取失敗: {e}")
-            # 失敗時回退到單獨獲取
-            for msg_id in batch_ids:
-                try:
-                    msg = service.users().messages().get(
-                        userId='me',
-                        id=msg_id,
-                        format='metadata',
-                        metadataHeaders=['From', 'Subject']
-                    ).execute()
+                # 分類
+                category, subtype = categorize_email(subject, sender_email, sender_name)
 
-                    headers = msg.get('payload', {}).get('headers', [])
-                    from_header = None
-                    subject = None
-
-                    for header in headers:
-                        if header['name'] == 'From':
-                            from_header = header['value']
-                        elif header['name'] == 'Subject':
-                            subject = header['value']
-
-                    sender_name = None
-                    sender_email = None
-                    if from_header:
-                        match = re.search(r'^(.*?)\s*<([^>]+)>$', from_header)
-                        if match:
-                            sender_name = match.group(1).strip('" ')
-                            sender_email = match.group(2)
-                        else:
-                            sender_email = from_header.strip()
-
-                    msg_label_ids = msg.get('labelIds', [])
-                    if 'IMPORTANT' in msg_label_ids:
-                        skipped_important += 1
-                        skipped += 1
-                        continue
-
-                    category, subtype = categorize_email(subject, sender_email, sender_name)
-
-                    if category and category in categorized:
+                if category and category in categorized:
+                    categorized[category].append(msg_id)
+                elif category == 'pure_ad' and subtype:
+                    # 如果被分類為純廣告，確認是否在白名單
+                    if not is_whitelisted(subject, sender_email, sender_name):
                         categorized[category].append(msg_id)
-                    elif category == 'pure_ad' and subtype:
-                        if not is_whitelisted(subject, sender_email, sender_name):
-                            categorized[category].append(msg_id)
-                        else:
-                            skipped_whitelisted += 1
-                            skipped += 1
                     else:
+                        skipped_whitelisted += 1
                         skipped += 1
+                else:
+                    skipped += 1
 
-                except Exception as e2:
-                    print(f"    ✗ 處理郵件 {msg_id} 失敗: {e2}")
-                    continue
+            except Exception as e:
+                print(f"  Warning: 處理郵件失敗: {e}")
+                continue
 
     print(f"\n分類完成:")
     print(f"  純廣告類: {len(categorized['pure_ad'])} 封")
