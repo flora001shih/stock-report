@@ -58,21 +58,37 @@ def is_us_market_open(date):
     # Check if it's a holiday
     return (date.year, date.month, date.day) not in US_MARKET_HOLIDAYS
 
-def get_stock_data(symbol, days_back=1):
-    """Get stock data for the given symbol"""
+def get_stock_data(symbol):
+    """Get stock data for the given symbol (previous trading day close vs day before)"""
+    import pytz
+
     ticker = yf.Ticker(symbol)
 
-    # Get historical data
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=10)  # Get more days to find the last trading day
+    # Get Taiwan timezone
+    taiwan_tz = pytz.timezone('Asia/Taipei')
+    now = datetime.now(taiwan_tz)
 
-    hist = ticker.history(start=start_date.strftime('%Y-%m-%d'),
-                         end=end_date.strftime('%Y-%m-%d'))
+    # We want the previous trading day's close price
+    # Taiwan 06:00 = US 17:00 previous day (before market opens)
+    # So we should get data up to yesterday
+
+    # Set end_date to yesterday (Taiwan time)
+    # This ensures we get complete closing data, not intraday
+    yesterday = now - timedelta(days=1)
+
+    # Set start_date to 10 days ago to ensure we have enough trading days
+    start_date = yesterday - timedelta(days=15)
+
+    # Format dates for yfinance (use UTC to avoid timezone issues)
+    start_date_utc = start_date.astimezone(pytz.UTC).strftime('%Y-%m-%d')
+    end_date_utc = yesterday.astimezone(pytz.UTC).strftime('%Y-%m-%d')
+
+    hist = ticker.history(start=start_date_utc, end=end_date_utc)
 
     if len(hist) < 2:
         return None, None, None
 
-    # Get the last two trading days
+    # Get the last two trading days (most recent complete days)
     latest = hist.iloc[-1]
     previous = hist.iloc[-2]
 
@@ -212,13 +228,16 @@ def get_credentials():
 
 def generate_report():
     """Generate the stock report"""
-    # Check if US market was open yesterday
+    # Check if US market was open 2 days ago
+    # Because we run at 06:00 Taiwan time, which is before US market opens on "yesterday"
+    # So we want to report on the previous completed trading day
     taiwan_tz = pytz.timezone('Asia/Taipei')
     today = datetime.now(taiwan_tz).date()
     yesterday = today - timedelta(days=1)
+    report_date = today - timedelta(days=2)  # Report on 2 days ago (the last completed trading day)
 
-    if not is_us_market_open(yesterday):
-        print(f"US market was closed on {yesterday}. Skipping report.")
+    if not is_us_market_open(report_date):
+        print(f"US market was closed on {report_date}. Skipping report.")
         return None
 
     # Get stock data
@@ -238,7 +257,7 @@ def generate_report():
     tsm_arrow = '▲' if tsm_change >= 0 else '▼'
 
     # Format subject: [[美股04/14]道瓊▲ 317.74 (0.66%).台積電▲ $10.32 (2.79%)]
-    date_str = yesterday.strftime('%m/%d')
+    date_str = report_date.strftime('%m/%d')
     subject = f"[[美股{date_str}]道瓊{dow_arrow} {abs(dow_change):,.2f} ({abs(dow_change_pct):.2f}%).台積電{tsm_arrow} ${abs(tsm_change):.2f} ({abs(tsm_change_pct):.2f}%)]"
 
     body = f"""
@@ -262,7 +281,7 @@ def generate_report():
 <body>
     <div class="header">
         <h2>📊 美股日報</h2>
-        <p>{yesterday.strftime('%Y年%m月%d日')}</p>
+        <p>{report_date.strftime('%Y年%m月%d日')}</p>
     </div>
     <div class="content">
         <div class="stock-card">
