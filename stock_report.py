@@ -58,42 +58,50 @@ def is_us_market_open(date):
     # Check if it's a holiday
     return (date.year, date.month, date.day) not in US_MARKET_HOLIDAYS
 
-def get_stock_data(symbol):
-    """Get stock data for the given symbol (previous trading day close vs day before)"""
+def get_stock_data(symbol, report_date):
+    """Get stock data for the given symbol on report_date vs day before"""
     import pytz
 
     ticker = yf.Ticker(symbol)
 
-    # Get Taiwan timezone
-    taiwan_tz = pytz.timezone('Asia/Taipei')
-    now = datetime.now(taiwan_tz)
+    # report_date is the date we want to report on (e.g., 2026-04-15)
+    # We want its closing price and the previous trading day's closing price
 
-    # We want the previous trading day's close price
-    # Taiwan 06:00 = US 17:00 previous day (before market opens)
-    # So we should get data up to yesterday
+    # Convert report_date to datetime at midnight UTC
+    report_dt = datetime.combine(report_date, datetime.min.time()).replace(tzinfo=pytz.UTC)
 
-    # Set end_date to yesterday (Taiwan time)
-    # This ensures we get complete closing data, not intraday
-    yesterday = now - timedelta(days=1)
+    # Set end_date to report_date + 1 day (to include report_date's data)
+    end_date = report_dt + timedelta(days=1)
 
-    # Set start_date to 10 days ago to ensure we have enough trading days
-    start_date = yesterday - timedelta(days=15)
+    # Set start_date to 15 days before to ensure we have enough trading days
+    start_date = report_dt - timedelta(days=15)
 
-    # Format dates for yfinance (use UTC to avoid timezone issues)
-    start_date_utc = start_date.astimezone(pytz.UTC).strftime('%Y-%m-%d')
-    end_date_utc = yesterday.astimezone(pytz.UTC).strftime('%Y-%m-%d')
+    # Format dates for yfinance
+    start_date_str = start_date.strftime('%Y-%m-%d')
+    end_date_str = end_date.strftime('%Y-%m-%d')
 
-    hist = ticker.history(start=start_date_utc, end=end_date_utc)
+    hist = ticker.history(start=start_date_str, end=end_date_str)
 
     if len(hist) < 2:
         return None, None, None
 
-    # Get the last two trading days (most recent complete days)
-    latest = hist.iloc[-1]
-    previous = hist.iloc[-2]
+    # Find the data for report_date (most recent on or before report_date)
+    report_data = None
+    prev_data = None
 
-    latest_close = latest['Close']
-    previous_close = previous['Close']
+    for i in range(len(hist) - 1, -1, -1):
+        hist_date = hist.index[i].date()
+        if hist_date <= report_date.date():
+            report_data = hist.iloc[i]
+            if i > 0:
+                prev_data = hist.iloc[i - 1]
+            break
+
+    if report_data is None or prev_data is None:
+        return None, None, None
+
+    latest_close = report_data['Close']
+    previous_close = prev_data['Close']
     change = latest_close - previous_close
     change_pct = (change / previous_close) * 100
 
@@ -228,23 +236,22 @@ def get_credentials():
 
 def generate_report():
     """Generate the stock report"""
-    # Check if US market was open 2 days ago
-    # Because we run at 06:00 Taiwan time, which is before US market opens on "yesterday"
-    # So we want to report on the previous completed trading day
+    # We run at 06:00 Taiwan time = 22:00 UTC previous day = 18:00 US Eastern (market closed)
+    # So we should report on the previous trading day's complete closing data
+
     taiwan_tz = pytz.timezone('Asia/Taipei')
     today = datetime.now(taiwan_tz).date()
-    yesterday = today - timedelta(days=1)
-    report_date = today - timedelta(days=2)  # Report on 2 days ago (the last completed trading day)
+    report_date = today - timedelta(days=1)  # Report on yesterday (04/15 when we run on 04/16 06:00)
 
     if not is_us_market_open(report_date):
         print(f"US market was closed on {report_date}. Skipping report.")
         return None
 
-    # Get stock data
+    # Get stock data for report_date
     # Dow Jones Industrial Average: ^DJI
     # TSMC ADR: TSM
-    dow_close, dow_change, dow_change_pct = get_stock_data('^DJI')
-    tsm_close, tsm_change, tsm_change_pct = get_stock_data('TSM')
+    dow_close, dow_change, dow_change_pct = get_stock_data('^DJI', report_date)
+    tsm_close, tsm_change, tsm_change_pct = get_stock_data('TSM', report_date)
 
     if dow_close is None or tsm_close is None:
         print("Error: Could not get stock data.")
