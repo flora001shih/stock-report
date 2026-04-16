@@ -30,7 +30,7 @@ if github_token:
 # Configuration
 TOKEN_FILE = 'token_gmail.json'
 RECIPIENT_EMAIL = os.environ.get('RECIPIENT_EMAIL', 'florashih324@gmail.com')
-LABEL_NAME = 'MCP'
+LABEL_NAME = 'MCP週報'
 SCOPES = ['https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/gmail.labels',
           'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.modify']
 
@@ -567,7 +567,7 @@ def send_email(service, subject, body, label_id=None):
     return message_id
 
 def get_or_create_label(service):
-    """Get or create the [MCP] label"""
+    """Get or create the [MCP週報] label"""
     try:
         labels = service.users().labels().list(userId='me').execute()
         for label in labels.get('labels', []):
@@ -587,6 +587,162 @@ def get_or_create_label(service):
     except Exception as e:
         print(f"Warning: Could not create label: {e}")
         return None
+
+def get_mcp_weekly_reports(service):
+    """Get all emails with [MCP週報] label"""
+    try:
+        query = f'label:{LABEL_NAME}'
+        results = service.users().messages().list(
+            userId='me',
+            q=query,
+            maxResults=50
+        ).execute()
+
+        messages = results.get('messages', [])
+        print(f"找到 {len(messages)} 封帶有 '{LABEL_NAME}' 標籤的郵件")
+
+        # Get detailed info for each message (including date and subject)
+        message_details = []
+        for msg in messages:
+            try:
+                msg_info = service.users().messages().get(
+                    userId='me',
+                    id=msg['id'],
+                    format='metadata',
+                    metadataHeaders=['Date', 'Subject']
+                ).execute()
+
+                headers = msg_info.get('payload', {}).get('headers', [])
+                date_str = None
+                subject = None
+
+                for header in headers:
+                    if header['name'] == 'Date':
+                        date_str = header['value']
+                    elif header['name'] == 'Subject':
+                        subject = header['value']
+
+                # Parse date to datetime for comparison
+                from email.utils import parsedate_to_datetime
+                date_dt = parsedate_to_datetime(date_str) if date_str else None
+
+                message_details.append({
+                    'id': msg['id'],
+                    'subject': subject,
+                    'date': date_str,
+                    'date_dt': date_dt
+                })
+            except Exception as e:
+                print(f"Warning: Could not get details for message {msg['id']}: {e}")
+
+        return message_details
+    except Exception as e:
+        print(f"Warning: Could not search for MCP weekly reports: {e}")
+        return []
+
+def cleanup_old_monthly_reports(service, current_message_id):
+    """Clean up old monthly reports, keep only the last one from previous month"""
+    all_reports = get_mcp_weekly_reports(service)
+
+    if not all_reports:
+        print("沒有找到舊的 MCP 週報郵件")
+        return
+
+    # Filter out the newly sent message
+    reports = [r for r in all_reports if r['id'] != current_message_id]
+
+    if not reports:
+        print("沒有需要清理的舊郵件")
+        return
+
+    # Get current month (Taiwan timezone)
+    taiwan_tz = pytz.timezone('Asia/Taipei')
+    now = datetime.now(taiwan_tz)
+    current_year = now.year
+    current_month = now.month
+
+    print(f"當前時間：{now.strftime('%Y/%m/%d %H:%M:%S')}")
+
+    # Categorize reports by month
+    reports_by_month = {}
+
+    for report in reports:
+        if report['date_dt']:
+            # Convert to Taiwan timezone
+            if report['date_dt'].tzinfo is None:
+                report_date_tz = pytz.utc.localize(report['date_dt']).astimezone(taiwan_tz)
+            else:
+                report_date_tz = report['date_dt'].astimezone(taiwan_tz)
+
+            report_year = report_date_tz.year
+            report_month = report_date_tz.month
+            key = (report_year, report_month)
+
+            if key not in reports_by_month:
+                reports_by_month[key] = []
+            reports_by_month[key].append(report)
+
+    # Process each month's reports
+    to_trash = []
+
+    for (year, month), month_reports in sorted(reports_by_month.items()):
+        if year == current_year and month == current_month:
+            print(f"本月 ({year}/{month}): 保留所有 {len(month_reports)} 封週報")
+        else:
+            # Previous month or older: keep only the last one
+            month_reports_sorted = sorted(month_reports, key=lambda x: x['date_dt'], reverse=True)
+
+            if len(month_reports_sorted) > 1:
+                # Keep the first (last sent), move rest to trash
+                keep_report = month_reports_sorted[0]
+                trash_reports = month_reports_sorted[1:]
+
+                print(f"{year}/{month}: 保留最後一封 (發送於 {keep_report['date_dt'].strftime('%Y/%m/%d %H:%M')})")
+                print(f"{year}/{month}: 將 {len(trash_reports)} 封舊郵件移至垃圾桶")
+
+                to_trash.extend([r['id'] for r in trash_reports])
+            else:
+                print(f"{year}/{month}: 只有 {len(month_reports)} 封週報，保留")
+
+    # Move reports to trash using batchModify if possible
+    if to_trash:
+        print(f"\n開始移動 {len(to_trash)} 封郵件至垃圾桶...")
+        moved_count = 0
+
+        # Process in batches of 50 (Gmail API limit for batchModify)
+        batch_size = 50
+        for i in range(0, len(to_trash), batch_size):
+            batch = to_trash[i:i + batch_size]
+            try:
+                service.users().messages().batchModify(
+                    userId='me',
+                    body={
+                        'ids': batch,
+                        'addLabelIds': ['TRASH'],
+                        'removeLabelIds': ['INBOX']
+                    }
+                ).execute()
+                moved_count += len(batch)
+            except Exception as e:
+                print(f"Warning: Batch modify failed for {len(batch)} messages: {e}")
+                # Fallback to individual moves
+                for msg_id in batch:
+                    try:
+                        service.users().messages().modify(
+                            userId='me',
+                            id=msg_id,
+                            body={
+                                'addLabelIds': ['TRASH'],
+                                'removeLabelIds': ['INBOX']
+                            }
+                        ).execute()
+                        moved_count += 1
+                    except Exception as e2:
+                        print(f"Warning: Could not move {msg_id} to trash: {e2}")
+
+        print(f"成功移動 {moved_count} 封舊郵件至垃圾桶")
+    else:
+        print("沒有需要移至垃圾桶的郵件")
 
 def main():
     """Main function"""
@@ -644,6 +800,13 @@ def main():
 
     message_id = send_email(service, subject, html, label_id)
     print(f"郵件發送成功！Message ID: {message_id}")
+
+    # Clean up old monthly reports
+    print()
+    print("=" * 60)
+    print("清理舊月度週報")
+    print("=" * 60)
+    cleanup_old_monthly_reports(service, message_id)
 
 if __name__ == '__main__':
     main()
