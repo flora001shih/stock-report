@@ -1,0 +1,9 @@
+# LINE Bot 依賴
+flask>=2.3.0
+requests>=2.31.0
+
+# 部署依賴
+gunicorn>=21.2.0
+
+# 開發依賴
+python-dotenv>=1.0.0

@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# 環境變數
+.env
+*.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# 日誌
+*.log
+
+# LINE Bot 特定
+# (無需忽略，因為 app.py 在此目錄)

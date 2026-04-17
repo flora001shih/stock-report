@@ -1,0 +1,73 @@
+name: 家用記帳 - LINE Bot 觸發
+
+on:
+  # 接收 LINE Bot 發送的 repository_dispatch 事件
+  repository_dispatch:
+    types: [accounting_request]
+
+  # 支援手動觸發（測試用）
+  workflow_dispatch:
+    inputs:
+      user_id:
+        description: '使用者 ID'
+        required: false
+        default: 'test_user'
+      display_name:
+        description: '顯示名稱'
+        required: false
+        default: '測試使用者'
+      message:
+        description: '訊息內容'
+        required: false
+        default: '記帳'
+
+jobs:
+  process-accounting:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib pytz
+
+      - name: 記帳處理
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          GMAIL_TOKEN: ${{ secrets.GMAIL_TOKEN }}
+        run: |
+          # 將 GitHub 輸入轉換為環境變數
+          USER_ID="${{ github.event.client_payload.user_id }}"
+          DISPLAY_NAME="${{ github.event.client_payload.display_name }}"
+          MESSAGE="${{ github.event.client_payload.message }}"
+
+          # 如果是手動觸發，使用輸入值
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            USER_ID="${{ github.event.inputs.user_id }}"
+            DISPLAY_NAME="${{ github.event.inputs.display_name }}"
+            MESSAGE="${{ github.event.inputs.message }}"
+          fi
+
+          echo "使用者: $DISPLAY_NAME ($USER_ID)"
+          echo "訊息: $MESSAGE"
+
+          # 執行記帳腳本
+          python scripts/line_bot_accounting.py \
+            --user-id "$USER_ID" \
+            --display-name "$DISPLAY_NAME" \
+            --message "$MESSAGE"
+
+      - name: Upload result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accounting-result-${{ github.run_number }}
+          path: accounting_result.json
+          retention-days: 30

@@ -50,6 +50,9 @@ gmail_janitor_report.json
 gmail_important_restored.json
 gmail_missing_important_restored.json
 
+# LINE Bot
+accounting_result.json
+
 # Keep these specific markdown files
 !README.md
 !CLAUDE_SETTINGS_BACKUP.md
