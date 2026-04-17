@@ -17,13 +17,13 @@ print("=" * 60)
 # 測試用例
 test_cases = [
     {
-        "name": "基本記帳 - 友方午餐",
+        "name": "基本記帳 - 友方午餐（預設今天）",
         "user_id": "test_user_001",
         "display_name": "測試使用者",
         "message": "記帳 友方 午餐 -150"
     },
     {
-        "name": "記帳 - 一銀票券（含日期）",
+        "name": "記帳 - 一銀票券（今天）",
         "user_id": "test_user_002",
         "display_name": "一銀測試",
         "message": "記帳 一銀 南方莊園一日遊票券 1390 今天"
@@ -39,6 +39,12 @@ test_cases = [
         "user_id": "test_user_004",
         "display_name": "日期測試",
         "message": "記帳 友方 晚餐 -200 2026/04/17"
+    },
+    {
+        "name": "記帳 - 昨天（跨月測試）",
+        "user_id": "test_user_005",
+        "display_name": "昨天測試",
+        "message": "記帳 友方 早餐 -50 昨天"
     },
 ]
 

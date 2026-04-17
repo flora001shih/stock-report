@@ -72,10 +72,23 @@ def get_sheets_service():
 # 解析日期
 def parse_date(date_str):
     """解析日期字串，返回 (年, 月, 日)"""
+    taiwan_tz = pytz.timezone('Asia/Taipei')
+    now = datetime.now(taiwan_tz)
+
     if not date_str or date_str in ['今天', '今日']:
-        taiwan_tz = pytz.timezone('Asia/Taipei')
-        now = datetime.now(taiwan_tz)
         return now.year, now.month, now.day
+
+    # 昨天
+    if date_str in ['昨天', '昨日']:
+        from datetime import timedelta
+        yesterday = now - timedelta(days=1)
+        return yesterday.year, yesterday.month, yesterday.day
+
+    # 明天
+    if date_str == '明天':
+        from datetime import timedelta
+        tomorrow = now + timedelta(days=1)
+        return tomorrow.year, tomorrow.month, tomorrow.day
 
     # 支援多種格式: 2026/04/17, 2026/4/17, 04/17, 4/17
     parts = date_str.replace('/', '-').split('-')
@@ -85,7 +98,6 @@ def parse_date(date_str):
         year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
     elif len(parts) == 2:
         # 僅月日: MM-DD (假設當年)
-        now = datetime.now()
         year = now.year
         month, day = int(parts[0]), int(parts[1])
     else:
@@ -96,10 +108,12 @@ def parse_date(date_str):
 
 # 解析記帳訊息
 def parse_accounting_message(message):
-    """解析記帳訊息，返回 (人物, 明細, 金額, 日期)"""
+    """解析記帳訊息，返回 (人物, 明細, 金額, 日期, date_str原文)"""
     # 基本格式: "記帳 人物 明細 金額 [日期]"
     # 範例: "記帳 友方 午餐 -150"
     # 範例: "記帳 一銀 南方莊園一日遊票券 1390 今天"
+    # 範例: "記帳 昇華 晚餐 -200 昨天" (記到昨天的月份欄位)
+    # ⚠️ 重要: 日期決定了記帳位置（哪個月份的欄位）
 
     # 移除記帳關鍵字
     msg = message
@@ -110,7 +124,7 @@ def parse_accounting_message(message):
     parts = msg.split()
 
     if len(parts) < 3:
-        return None, None, None, None
+        return None, None, None, None, None
 
     # 解析人物
     person = parts[0]
@@ -119,7 +133,7 @@ def parse_accounting_message(message):
         if person == '家庭一銀刷卡':
             person = '一銀'
         elif person not in PERSON_MAP:
-            return None, None, None, None
+            return None, None, None, None, None
 
     # 解析金額（最後一個數字）
     amount = None
@@ -129,14 +143,14 @@ def parse_accounting_message(message):
             break
 
     if amount is None:
-        return None, None, None, None
+        return None, None, None, None, None
 
     # 解析明細（人物後到金額前）
     detail = ' '.join(parts[1:parts.index(str(amount))]) if str(amount) in parts else ''
 
     # 解析日期（檢查是否包含日期關鍵字）
     date_str = None
-    date_keywords = ['今天', '今日', '明天', '昨日']
+    date_keywords = ['今天', '今日', '明天', '昨天', '昨日']
     for keyword in date_keywords:
         if keyword in msg:
             date_str = keyword
@@ -149,12 +163,16 @@ def parse_accounting_message(message):
     if date_match:
         date_str = date_match.group().replace('/', '-')
 
+    # 如果沒有指定日期，預設為「今天」
+    if date_str is None:
+        date_str = '今天'
+
     # 解析日期
     year, month, day = parse_date(date_str)
     if year is None:
-        return None, None, None, None
+        return None, None, None, None, None
 
-    return person, detail, amount, (year, month, day)
+    return person, detail, amount, (year, month, day), date_str
 
 
 # 尋找空白列
@@ -177,7 +195,7 @@ def find_empty_row(service, spreadsheet_id, range_name):
 
 
 # 寫入記帳資料
-def write_expense(service, person, detail, amount, date):
+def write_expense(service, person, detail, amount, date, date_str_original):
     """寫入記帳資料到 Google Sheets"""
     year, month, day = date
 
@@ -214,7 +232,10 @@ def write_expense(service, person, detail, amount, date):
         body=body
     ).execute()
 
-    return True, f"✅ 記帳成功！\n\n人物: {person_full}\n明細: {detail}\n金額: {amount}\n日期: {date_value}"
+    # 顯示清楚的月份資訊
+    month_text = f"{month}月"
+
+    return True, f"✅ 記帳成功！\n\n📅 日期: {date_value} ({date_str_original})\n🗓️ 月份: {month_text}\n👤 人物: {person_full}\n📝 明細: {detail}\n💰 金額: {amount}"
 
 
 def main():
@@ -231,7 +252,7 @@ def main():
     print(f"========================================")
 
     # 解析記帳訊息
-    person, detail, amount, date = parse_accounting_message(args.message)
+    person, detail, amount, date, date_str_original = parse_accounting_message(args.message)
 
     if person is None:
         result = {
@@ -241,9 +262,14 @@ def main():
         }
         print("❌ 無法解析記帳訊息")
         print("\n正確格式範例：")
-        print("• 記帳 友方 午餐 -150")
-        print("• 記帳 一銀 南方莊園一日遊票券 1390 今天")
-        print("• 記帳 昇華 自带杯退费 +5")
+        print("• 記帳 友方 午餐 -150              (預設今天)")
+        print("• 記帳 一銀 南方莊園票券 1390 今天 (記到今天)")
+        print("• 記帳 昇華 晚餐 -200 昨天       (記到昨天的月份欄位)")
+        print("• 記帳 友方 早餐 -50 2026/04/16   (記到指定日期)")
+        print("\n⚠️ 重要提示：")
+        print("• 日期決定了記帳位置（哪個月份的欄位）")
+        print("• 如果記「昨天」，會記到昨天的月份欄位")
+        print("• 不指定日期預設為「今天」")
     else:
         # 寫入 Google Sheets
         service = get_sheets_service()
@@ -254,7 +280,7 @@ def main():
             }
             print("❌ 無法連接 Google Sheets")
         else:
-            success, message = write_expense(service, person, detail, amount, date)
+            success, message = write_expense(service, person, detail, amount, date, date_str_original)
             result = {
                 'success': success,
                 'message': message,
