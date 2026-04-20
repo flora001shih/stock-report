@@ -5,6 +5,12 @@ Discord Bot - 家用記帳
 接收 Discord 訊息並觸發 GitHub Actions
 """
 import os
+import sys
+
+# Windows UTF-8 輸出
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 import json
 import hmac
 import hashlib
@@ -159,7 +165,7 @@ async def accounting(ctx, date: str = None, person: str = None, detail: str = No
     await processing_msg.edit(content=reply_text)
 
 
-@bot.command(name='說明', aliases=['help', 'usage'])
+@bot.command(name='說明', aliases=['usage', 'info'])
 async def show_help(ctx):
     """顯示幫助訊息"""
     help_text = """👋 **歡迎使用家用記帳 Discord Bot！**
