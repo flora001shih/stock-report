@@ -1,7 +1,7 @@
-name: 家用記帳 - LINE Bot / Discord Bot 觸發
+name: 家用記帳-Discord Bot 觸發
 
 on:
-  # 接收 LINE Bot 發送的 repository_dispatch 事件
+  # 接收 Discord Bot 發送的 repository_dispatch 事件
   repository_dispatch:
     types: [accounting_request]
 
@@ -19,7 +19,7 @@ on:
       message:
         description: '訊息內容'
         required: false
-        default: '記帳'
+        default: '記帳 友方 測試 -1'
 
 jobs:
   process-accounting:
@@ -41,7 +41,6 @@ jobs:
       - name: 記帳處理
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
-          GMAIL_TOKEN: ${{ secrets.GMAIL_TOKEN }}
         run: |
           # 將 GitHub 輸入轉換為環境變數
           USER_ID="${{ github.event.client_payload.user_id }}"
