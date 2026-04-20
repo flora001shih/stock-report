@@ -257,9 +257,9 @@ def generate_report():
         print("Error: Could not get stock data.")
         return None
 
-    # Format the report
-    dow_color = '#22c55e' if dow_change >= 0 else '#ef4444'
-    tsm_color = '#22c55e' if tsm_change >= 0 else '#ef4444'
+    # Format the report (台灣慣例：上漲紅色、下跌綠色)
+    dow_color = '#ef4444' if dow_change >= 0 else '#22c55e'
+    tsm_color = '#ef4444' if tsm_change >= 0 else '#22c55e'
     dow_arrow = '▲' if dow_change >= 0 else '▼'
     tsm_arrow = '▲' if tsm_change >= 0 else '▼'
 
@@ -280,8 +280,8 @@ def generate_report():
         .stock-name {{ font-size: 18px; font-weight: bold; margin-bottom: 10px; }}
         .price {{ font-size: 24px; font-weight: bold; }}
         .change {{ font-size: 16px; margin-top: 5px; }}
-        .positive {{ color: #22c55e; }}
-        .negative {{ color: #ef4444; }}
+        .positive {{ color: #ef4444; }}
+        .negative {{ color: #22c55e; }}
         .footer {{ text-align: center; color: #6b7280; font-size: 12px; margin-top: 20px; }}
     </style>
 </head>
