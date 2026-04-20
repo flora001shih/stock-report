@@ -54,7 +54,7 @@
 | Secret 名稱 | 說明 |
 |-------------|------|
 | `DISCORD_BOT_TOKEN` | Discord Bot Token |
-| `GITHUB_TOKEN` | GitHub Personal Access Token (需 repo 權限) |
+| `GH_TOKEN` | GitHub Personal Access Token (需 repo 權限) |
 | `GOOGLE_CREDENTIALS` | Google Service Account JSON (Base64 編碼) |
 
 ### 2. 部署 Discord Bot
@@ -71,7 +71,7 @@
 添加環境變數：
 ```
 DISCORD_BOT_TOKEN=your_token
-GITHUB_TOKEN=your_github_pat
+GH_TOKEN=your_github_pat
 GITHUB_REPO=your-username/your-repo
 ```
 

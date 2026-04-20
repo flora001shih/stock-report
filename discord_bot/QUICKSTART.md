@@ -18,10 +18,10 @@
 | 名稱 | 值 | 獲取方式 |
 |------|-----|----------|
 | `DISCORD_BOT_TOKEN` | 你的 Discord Bot Token | 從 Discord Developer Portal 獲取 |
-| `GITHUB_TOKEN` | (需創建) | 見下方說明 |
+| `GH_TOKEN` | (需創建) | 見下方說明 |
 | `GOOGLE_CREDENTIALS` | (需編碼) | 見下方說明 |
 
-### 創建 GITHUB_TOKEN
+### 創建 GH_TOKEN
 
 1. 前往 GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
 2. 點擊「Generate new token」
@@ -59,7 +59,7 @@ Start Command: python app.py
 | Key | Value |
 |-----|-------|
 | `DISCORD_BOT_TOKEN` | 你的 Discord Bot Token |
-| `GITHUB_TOKEN` | (你的 GitHub PAT) |
+| `GH_TOKEN` | (你的 GitHub PAT) |
 | `GITHUB_REPO` | `flora001shih/C--Claude-Test-Lab` |
 
 7. 點擊「Create Web Service」
@@ -144,7 +144,7 @@ Start Command: python app.py
 
 ### 記帳失敗
 - 檢查 GitHub Actions 是否執行 (Repository → Actions)
-- 確認 GITHUB_TOKEN 有 repo 權限
+- 確認 GH_TOKEN 有 repo 權限
 - 檢查 GOOGLE_CREDENTIALS 是否正確
 
 ### Google Sheets 沒有更新

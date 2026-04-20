@@ -20,7 +20,7 @@ load_dotenv()
 DISCORD_BOT_TOKEN = os.environ.get('DISCORD_BOT_TOKEN')
 
 # GitHub 設定
-GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
+GH_TOKEN = os.environ.get('GH_TOKEN')
 GITHUB_REPO = os.environ.get('GITHUB_REPO', 'flora-wu/C--Claude-Test-Lab')
 
 # Discord Bot 設定
@@ -43,7 +43,7 @@ def trigger_github_action(user_id, display_name, message_text):
     }
 
     headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
+        "Authorization": f"token {GH_TOKEN}",
         "Accept": "application/vnd.github.v3+json",
         "Content-Type": "application/json"
     }
@@ -218,8 +218,8 @@ if __name__ == '__main__':
         exit(1)
 
     # 檢查 GitHub Token
-    if not GITHUB_TOKEN:
-        print("❌ 錯誤: 請設定 GITHUB_TOKEN 環境變數")
+    if not GH_TOKEN:
+        print("❌ 錯誤: 請設定 GH_TOKEN 環境變數")
         exit(1)
 
     print("🚀 啟動 Discord Bot...")
