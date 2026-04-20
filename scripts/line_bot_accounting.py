@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-LINE Bot 記帳處理腳本
-接收來自 LINE Bot 的記帳請求並寫入 Google Sheets
+記帳處理腳本
+接收來自 Discord Bot 的記帳請求並寫入 Google Sheets
 """
 import os
 import sys
 import json
 import argparse
 import base64
+import tempfile
 from datetime import datetime
 import pytz
 
@@ -19,18 +20,23 @@ if sys.platform == 'win32':
 
 # 解碼 Google Credentials
 google_creds = os.environ.get('GOOGLE_CREDENTIALS', '')
+credentials_path = None
+
 if google_creds:
     try:
         creds_data = base64.b64decode(google_creds).decode('utf-8')
-        with open('flora-gae11-48f2f2e53de7.json', 'w', encoding='utf-8') as f:
+        # 使用暫時目錄來寫入憑證（避免衝突）
+        credentials_dir = tempfile.gettempdir()
+        credentials_path = os.path.join(credentials_dir, 'flora-gae11-48f2f2e53de7.json')
+        with open(credentials_path, 'w', encoding='utf-8') as f:
             f.write(creds_data)
-    except:
-        pass
+    except Exception as e:
+        print(f"Warning: 無法寫入 Google Credentials: {e}")
 
 # Google Sheets 設定
 SPREADSHEET_ID = '1J-Ia3CLNJxGL26zacWdj-85jsK_5NaS92OZRhoOyzUA'
 SHEET_NAME = '家用記帳合併'
-CREDENTIALS_FILE = 'flora-gae11-48f2f2e53de7.json'
+CREDENTIALS_FILE = credentials_path if credentials_path else 'flora-gae11-48f2f2e53de7.json'
 
 # 月份欄位對應表
 MONTH_COLUMNS = {
