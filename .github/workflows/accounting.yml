@@ -1,4 +1,4 @@
-name: 家用記帳 - LINE Bot 觸發
+name: 家用記帳 - LINE Bot / Discord Bot 觸發
 
 on:
   # 接收 LINE Bot 發送的 repository_dispatch 事件
